@@ -31,8 +31,8 @@ class MessagePriority(str, Enum):
 # Pydanticスキーマ
 class MMTPMessage(BaseModel):
     message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    sender_mrn: str = Field(..., regex=r"^urn:mrn:mcp:")
-    recipient_mrn: str = Field(..., regex=r"^urn:mrn:mcp:")
+    sender_mrn: str = Field(..., pattern=r"^urn:mrn:mcp:")
+    recipient_mrn: str = Field(..., pattern=r"^urn:mrn:mcp:")
     message_type: MessageType = MessageType.TEXT
     priority: MessagePriority = MessagePriority.NORMAL
     subject: Optional[str] = None

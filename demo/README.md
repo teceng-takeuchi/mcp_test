@@ -212,6 +212,18 @@ docker-compose logs -f mms
 ./scripts/health-check.sh
 ```
 
+**✅ 正常動作確認済みサービス:**
+- MIR (Maritime Identity Registry) - 組織・アイデンティティ管理
+- MSR (Maritime Service Registry) - サービス登録・検索  
+- MMS (Maritime Messaging Service) - メッセージング
+- Keycloak - 認証サーバー
+- PostgreSQL - データベース（PostGIS拡張含む）
+- Redis - キャッシュ・セッション管理
+
+**📝 注意事項:**
+- Nginxリバースプロキシは起動していますが、ヘルスチェックから除外されています
+- 各サービスには直接アクセス可能です（個別ポート経由）
+
 ## 開発
 
 ### 個別サービスの開発
@@ -269,6 +281,18 @@ echo "DB_PASSWORD=your_secure_password" >> .env
    docker-compose up postgres redis
    # その後他のサービス
    docker-compose up -d
+   ```
+
+5. **MSRの地理空間機能エラー**
+   ```bash
+   # PostGIS拡張が正しく読み込まれているか確認
+   docker-compose exec postgres psql -U mcp -d msr_db -c "SELECT postgis_version();"
+   ```
+
+6. **NumPy/Shapely依存関係エラー**
+   ```bash
+   # MSRコンテナを再ビルド
+   docker-compose up -d --build msr
    ```
 
 ### ログの分析

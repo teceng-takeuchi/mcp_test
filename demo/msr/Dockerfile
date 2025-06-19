@@ -5,10 +5,20 @@ WORKDIR /app
 # システム依存関係のインストール
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
     libpq-dev \
     libgeos-dev \
+    libgeos++-dev \
+    libproj-dev \
+    gdal-bin \
+    libgdal-dev \
     curl \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+# 環境変数の設定（GDALのため）
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
 
 # Python依存関係のインストール
 COPY requirements.txt .

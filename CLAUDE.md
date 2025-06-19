@@ -29,6 +29,12 @@ cd demo
 ./scripts/start.sh
 ```
 
+**✅ 動作確認済み（2025年6月19日時点）:**
+全てのコアMCPサービスが正常に動作することを確認済みです：
+- MIR、MSR、MMSの3つの主要サービス
+- PostgreSQL（PostGIS拡張付き）、Redis、Keycloak
+- 地理空間検索、Pydantic v2対応、NumPy互換性対応済み
+
 ### 必要な前提条件
 - Docker 20.10以上
 - Docker Compose 2.0以上
@@ -120,6 +126,11 @@ cd demo
 ```bash
 ./scripts/health-check.sh
 ```
+
+**注記**: ヘルスチェックでは以下のサービスを確認します：
+- MIR, MSR, MMS（MCPコアサービス）
+- Keycloak（認証サーバー）  
+- PostgreSQL, Redis（データストア）
 
 ## アクセスURL
 

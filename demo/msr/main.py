@@ -62,7 +62,7 @@ class ServiceInstance(Base):
     bbox_max_lat = Column(Float)
     bbox_min_lng = Column(Float)
     bbox_max_lng = Column(Float)
-    metadata = Column(JSON)
+    service_metadata = Column(JSON)
     last_health_check = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -76,11 +76,11 @@ class ServiceSpecificationBase(BaseModel):
     description: str = Field(..., min_length=1)
     keywords: Optional[List[str]] = []
     status: str = "draft"
-    organization_mrn: str = Field(..., regex=r"^urn:mrn:mcp:org:")
+    organization_mrn: str = Field(..., pattern=r"^urn:mrn:mcp:org:")
     specification_document: Optional[str] = None
 
 class ServiceSpecificationCreate(ServiceSpecificationBase):
-    mrn: str = Field(..., regex=r"^urn:mrn:mcp:service:")
+    mrn: str = Field(..., pattern=r"^urn:mrn:mcp:service:")
 
 class ServiceSpecificationResponse(ServiceSpecificationBase):
     mrn: str
@@ -93,16 +93,16 @@ class ServiceSpecificationResponse(ServiceSpecificationBase):
 class ServiceInstanceBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     version: str = Field(..., min_length=1, max_length=50)
-    service_specification_mrn: str = Field(..., regex=r"^urn:mrn:mcp:service:")
-    organization_mrn: str = Field(..., regex=r"^urn:mrn:mcp:org:")
+    service_specification_mrn: str = Field(..., pattern=r"^urn:mrn:mcp:service:")
+    organization_mrn: str = Field(..., pattern=r"^urn:mrn:mcp:org:")
     endpoint_uri: str = Field(..., min_length=1)
     endpoint_type: str = "REST"
     status: str = "active"
     coverage_area_wkt: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = {}
+    service_metadata: Optional[Dict[str, Any]] = {}
 
 class ServiceInstanceCreate(ServiceInstanceBase):
-    mrn: str = Field(..., regex=r"^urn:mrn:mcp:instance:")
+    mrn: str = Field(..., pattern=r"^urn:mrn:mcp:instance:")
 
 class ServiceInstanceResponse(ServiceInstanceBase):
     mrn: str

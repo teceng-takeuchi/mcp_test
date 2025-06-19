@@ -49,7 +49,7 @@ class OrganizationBase(BaseModel):
     website: Optional[str] = None
 
 class OrganizationCreate(OrganizationBase):
-    mrn: str = Field(..., regex=r"^urn:mrn:mcp:org:")
+    mrn: str = Field(..., pattern=r"^urn:mrn:mcp:org:")
 
 class OrganizationResponse(OrganizationBase):
     mrn: str

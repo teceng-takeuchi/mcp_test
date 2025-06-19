@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS service_instances (
     bbox_max_lat FLOAT,
     bbox_min_lng FLOAT,
     bbox_max_lng FLOAT,
-    metadata JSON,
+    service_metadata JSON,
     last_health_check TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

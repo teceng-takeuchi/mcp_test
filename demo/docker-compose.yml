@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PostgreSQLデータベース
   postgres:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.3-alpine
     container_name: mcp-demo-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-mcp}
@@ -198,23 +198,23 @@ services:
     networks:
       - mcp-network
 
-  # Web UI（管理ポータル）
-  web-ui:
-    build:
-      context: ./web-ui
-      dockerfile: Dockerfile
-    container_name: mcp-demo-web-ui
-    environment:
-      REACT_APP_API_BASE_URL: http://localhost:80
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: mcp
-      REACT_APP_KEYCLOAK_CLIENT_ID: mcp-web-ui
-    ports:
-      - "3000:3000"
-    depends_on:
-      - nginx
-    networks:
-      - mcp-network
+  # Web UI（管理ポータル）- 一時的にコメントアウト
+  # web-ui:
+  #   build:
+  #     context: ./web-ui
+  #     dockerfile: Dockerfile
+  #   container_name: mcp-demo-web-ui
+  #   environment:
+  #     REACT_APP_API_BASE_URL: http://localhost:80
+  #     REACT_APP_KEYCLOAK_URL: http://localhost:8080
+  #     REACT_APP_KEYCLOAK_REALM: mcp
+  #     REACT_APP_KEYCLOAK_CLIENT_ID: mcp-web-ui
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - nginx
+  #   networks:
+  #     - mcp-network
 
 volumes:
   postgres_data:
