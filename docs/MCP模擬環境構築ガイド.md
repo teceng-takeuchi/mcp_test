@@ -26,24 +26,29 @@
 
 ## 模擬環境のアーキテクチャ
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     MCP 模擬環境                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐ │
-│  │   MIR        │    │   MSR        │    │   MMS        │ │
-│  │ (Identity)   │◄───┤ (Service)    │◄───┤ (Messaging)  │ │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘ │
-│         │                    │                    │         │
-│  ┌──────▼───────────────────▼────────────────────▼───────┐ │
-│  │              共通インフラストラクチャ                     │ │
-│  │  ・Keycloak (Identity Broker)                         │ │
-│  │  ・PostgreSQL (データベース)                           │ │
-│  │  ・Redis (キャッシュ/セッション管理)                   │ │
-│  │  ・Nginx (リバースプロキシ)                           │ │
-│  └───────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph MCP["MCP 模擬環境"]
+        subgraph Core["コアコンポーネント"]
+            MIR["MIR<br/>(Identity)"]
+            MSR["MSR<br/>(Service)"]
+            MMS["MMS<br/>(Messaging)"]
+        end
+        
+        subgraph Infrastructure["共通インフラストラクチャ"]
+            Keycloak["Keycloak<br/>(Identity Broker)"]
+            PostgreSQL["PostgreSQL<br/>(データベース)"]
+            Redis["Redis<br/>(キャッシュ/セッション管理)"]
+            Nginx["Nginx<br/>(リバースプロキシ)"]
+        end
+        
+        MSR --> MIR
+        MMS --> MIR
+        
+        MIR --> Infrastructure
+        MSR --> Infrastructure
+        MMS --> Infrastructure
+    end
 ```
 
 ## 主要コンポーネントの技術仕様

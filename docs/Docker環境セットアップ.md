@@ -6,33 +6,52 @@
 
 ## ディレクトリ構造
 
-```
-mcp-simulation/
-├── docker-compose.yml          # メインのDocker Compose設定
-├── .env                        # 環境変数
-├── keycloak/                   # Keycloak設定
-│   ├── realm-export.json       # レルム設定
-│   └── themes/                 # カスタムテーマ（オプション）
-├── mir/                        # Maritime Identity Registry
-│   ├── Dockerfile
-│   ├── config/
-│   └── src/
-├── msr/                        # Maritime Service Registry
-│   ├── Dockerfile
-│   ├── config/
-│   └── src/
-├── mms/                        # Maritime Messaging Service
-│   ├── Dockerfile
-│   ├── config/
-│   └── src/
-├── nginx/                      # リバースプロキシ
-│   ├── nginx.conf
-│   └── ssl/
-├── postgres/                   # データベース初期化
-│   └── init.sql
-└── monitoring/                 # 監視設定（オプション）
-    ├── prometheus/
-    └── grafana/
+```mermaid
+graph TD
+    A[mcp-simulation/] --> B[docker-compose.yml]
+    A --> C[.env]
+    A --> D[keycloak/]
+    A --> E[mir/]
+    A --> F[msr/]
+    A --> G[mms/]
+    A --> H[nginx/]
+    A --> I[postgres/]
+    A --> J[monitoring/]
+    
+    B -.->|"メインのDocker Compose設定"| B
+    C -.->|"環境変数"| C
+    
+    D --> D1[realm-export.json]
+    D --> D2[themes/]
+    D -.->|"Keycloak設定"| D
+    D1 -.->|"レルム設定"| D1
+    D2 -.->|"カスタムテーマ（オプション）"| D2
+    
+    E --> E1[Dockerfile]
+    E --> E2[config/]
+    E --> E3[src/]
+    E -.->|"Maritime Identity Registry"| E
+    
+    F --> F1[Dockerfile]
+    F --> F2[config/]
+    F --> F3[src/]
+    F -.->|"Maritime Service Registry"| F
+    
+    G --> G1[Dockerfile]
+    G --> G2[config/]
+    G --> G3[src/]
+    G -.->|"Maritime Messaging Service"| G
+    
+    H --> H1[nginx.conf]
+    H --> H2[ssl/]
+    H -.->|"リバースプロキシ"| H
+    
+    I --> I1[init.sql]
+    I -.->|"データベース初期化"| I
+    
+    J --> J1[prometheus/]
+    J --> J2[grafana/]
+    J -.->|"監視設定（オプション）"| J
 ```
 
 ## Docker Compose設定

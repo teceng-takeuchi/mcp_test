@@ -9,40 +9,42 @@
 ### FastAPI（Python）による実装
 
 #### プロジェクト構造
-```
-mir/
-├── app/
-│   ├── main.py
-│   ├── config.py
-│   ├── database.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── organization.py
-│   │   ├── certificate.py
-│   │   └── user.py
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   ├── organization.py
-│   │   ├── certificate.py
-│   │   └── user.py
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── deps.py
-│   │   └── v1/
-│   │       ├── __init__.py
-│   │       ├── organizations.py
-│   │       ├── certificates.py
-│   │       └── users.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── security.py
-│   │   └── pki.py
-│   └── services/
-│       ├── __init__.py
-│       ├── organization.py
-│       └── certificate.py
-├── requirements.txt
-└── Dockerfile
+
+```mermaid
+graph TD
+    A[mir/] --> B[app/]
+    A --> Q[requirements.txt]
+    A --> R[Dockerfile]
+    
+    B --> C[main.py]
+    B --> D[config.py]
+    B --> E[database.py]
+    B --> F[models/]
+    B --> G[schemas/]
+    B --> H[api/]
+    B --> I[core/]
+    B --> J[services/]
+    
+    F --> F1[organization.py]
+    F --> F2[certificate.py]
+    F --> F3[user.py]
+    
+    G --> G1[organization.py]
+    G --> G2[certificate.py]
+    G --> G3[user.py]
+    
+    H --> H1[deps.py]
+    H --> H2[v1/]
+    
+    H2 --> H2A[organizations.py]
+    H2 --> H2B[certificates.py]
+    H2 --> H2C[users.py]
+    
+    I --> I1[security.py]
+    I --> I2[pki.py]
+    
+    J --> J1[organization.py]
+    J --> J2[certificate.py]
 ```
 
 #### main.py

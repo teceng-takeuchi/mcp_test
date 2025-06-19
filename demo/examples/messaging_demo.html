@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 船舶メッセージング デモ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .vessel { border-left: 4px solid #2196F3; }
+        .shore { border-left: 4px solid #4CAF50; }
+        
+        h1 { text-align: center; color: #333; }
+        h2 { color: #555; margin-top: 0; }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        }
+        .message.received {
+            background-color: #e3f2fd;
+            border-left-color: #2196F3;
+        }
+        .message.sent {
+            background-color: #f3e5f5;
+            border-left-color: #9c27b0;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        input, select, textarea, button {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚢 MCP 船舶メッセージング デモ</h1>
+    
+    <div class="container">
+        <!-- 船舶パネル -->
+        <div class="panel vessel">
+            <h2>🚢 船舶 (IMO: 1234567)</h2>
+            <div id="vesselStatus" class="status disconnected">切断中</div>
+            
+            <div class="controls">
+                <button id="vesselConnect">接続</button>
+                <button id="vesselDisconnect" disabled>切断</button>
+                
+                <h3>メッセージ送信</h3>
+                <select id="vesselMessageType">
+                    <option value="position_report">位置報告</option>
+                    <option value="port_entry_request">入港要請</option>
+                    <option value="distress_alert">緊急警報</option>
+                    <option value="status_update">状態更新</option>
+                </select>
+                
+                <input id="vesselSubject" placeholder="件名" value="位置報告">
+                <textarea id="vesselMessage" placeholder="メッセージ内容" rows="3">緯度: 35.6762, 経度: 139.6503, 針路: 090°, 速力: 12kts</textarea>
+                <button id="vesselSend" disabled>送信</button>
+                
+                <div class="quick-actions">
+                    <button id="sendPosition">位置報告送信</button>
+                    <button id="sendPortRequest">入港要請</button>
+                    <button id="sendEmergency">緊急信号</button>
+                    <button id="sendStatus">状態更新</button>
+                </div>
+            </div>
+            
+            <h3>メッセージ履歴</h3>
+            <div id="vesselMessages" class="messages"></div>
+        </div>
+        
+        <!-- 拠点パネル -->
+        <div class="panel shore">
+            <h2>🏛️ 東京湾VTS</h2>
+            <div id="shoreStatus" class="status disconnected">切断中</div>
+            
+            <div class="controls">
+                <button id="shoreConnect">接続</button>
+                <button id="shoreDisconnect" disabled>切断</button>
+                
+                <h3>メッセージ送信</h3>
+                <select id="shoreMessageType">
+                    <option value="navigation_instruction">航行指示</option>
+                    <option value="port_clearance">入港許可</option>
+                    <option value="weather_alert">気象警報</option>
+                    <option value="acknowledgment">確認応答</option>
+                </select>
+                
+                <input id="shoreSubject" placeholder="件名" value="航行指示">
+                <textarea id="shoreMessage" placeholder="メッセージ内容" rows="3">分離航路の右側通行を維持してください。速力を12ノット以下に制限します。</textarea>
+                <button id="shoreSend" disabled>送信</button>
+                
+                <div class="quick-actions">
+                    <button id="sendNavigation">航行指示</button>
+                    <button id="sendClearance">入港許可</button>
+                    <button id="sendWeatherAlert">気象警報</button>
+                    <button id="sendAck">確認応答</button>
+                </div>
+            </div>
+            
+            <h3>メッセージ履歴</h3>
+            <div id="shoreMessages" class="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let vesselWs = null;
+        let shoreWs = null;
+        
+        const vesselMrn = 'urn:mrn:mcp:vessel:imo:1234567';
+        const shoreMrn = 'urn:mrn:mcp:shore:authority:vts:tokyo-bay';
+        
+        // WebSocket接続関数
+        function connectVessel() {
+            try {
+                vesselWs = new WebSocket(`ws://localhost:8083/ws/${encodeURIComponent(vesselMrn)}`);
+                
+                vesselWs.onopen = function() {
+                    updateStatus('vesselStatus', '接続済み', 'connected');
+                    document.getElementById('vesselConnect').disabled = true;
+                    document.getElementById('vesselDisconnect').disabled = false;
+                    document.getElementById('vesselSend').disabled = false;
+                    addMessage('vesselMessages', 'システム', 'MMS接続が確立されました', 'received');
+                };
+                
+                vesselWs.onclose = function() {
+                    updateStatus('vesselStatus', '切断中', 'disconnected');
+                    document.getElementById('vesselConnect').disabled = false;
+                    document.getElementById('vesselDisconnect').disabled = true;
+                    document.getElementById('vesselSend').disabled = true;
+                    addMessage('vesselMessages', 'システム', 'MMS接続が切断されました', 'received');
+                };
+                
+                vesselWs.onmessage = function(event) {
+                    const message = JSON.parse(event.data);
+                    console.log('船舶側受信メッセージ:', message);
+                    
+                    // メッセージタイプによる処理分岐
+                    if (message.type === 'ack') {
+                        console.log('ACK受信:', message);
+                        return; // 確認応答は表示しない
+                    }
+                    
+                    if (message.type === 'error') {
+                        console.error('エラー受信:', message);
+                        addMessage('vesselMessages', 'システム', `エラー: ${message.message}`, 'received');
+                        return;
+                    }
+                    
+                    let senderLabel = '拠点';
+                    if (message.sender_mrn) {
+                        senderLabel = message.sender_mrn.includes('vessel') ? '船舶' : '拠点';
+                    }
+                    
+                    addMessage('vesselMessages', senderLabel, 
+                             `${message.subject || 'メッセージ'}: ${message.body}`, 'received');
+                };
+                
+                vesselWs.onerror = function(error) {
+                    console.error('船舶WebSocketエラー:', error);
+                    addMessage('vesselMessages', 'システム', 'WebSocket接続エラーが発生しました', 'received');
+                };
+                
+            } catch (error) {
+                console.error('船舶接続エラー:', error);
+                alert('接続に失敗しました。MMSサービスが起動していることを確認してください。');
+            }
+        }
+        
+        function connectShore() {
+            try {
+                shoreWs = new WebSocket(`ws://localhost:8083/ws/${encodeURIComponent(shoreMrn)}`);
+                
+                shoreWs.onopen = function() {
+                    updateStatus('shoreStatus', '接続済み', 'connected');
+                    document.getElementById('shoreConnect').disabled = true;
+                    document.getElementById('shoreDisconnect').disabled = false;
+                    document.getElementById('shoreSend').disabled = false;
+                    addMessage('shoreMessages', 'システム', 'MMS接続が確立されました', 'received');
+                };
+                
+                shoreWs.onclose = function() {
+                    updateStatus('shoreStatus', '切断中', 'disconnected');
+                    document.getElementById('shoreConnect').disabled = false;
+                    document.getElementById('shoreDisconnect').disabled = true;
+                    document.getElementById('shoreSend').disabled = true;
+                    addMessage('shoreMessages', 'システム', 'MMS接続が切断されました', 'received');
+                };
+                
+                shoreWs.onmessage = function(event) {
+                    const message = JSON.parse(event.data);
+                    console.log('拠点側受信メッセージ:', message);
+                    
+                    // メッセージタイプによる処理分岐
+                    if (message.type === 'ack') {
+                        console.log('ACK受信:', message);
+                        return; // 確認応答は表示しない
+                    }
+                    
+                    if (message.type === 'error') {
+                        console.error('エラー受信:', message);
+                        addMessage('shoreMessages', 'システム', `エラー: ${message.message}`, 'received');
+                        return;
+                    }
+                    
+                    let senderLabel = '船舶';
+                    if (message.sender_mrn) {
+                        senderLabel = message.sender_mrn.includes('vessel') ? '船舶' : '拠点';
+                    }
+                    
+                    addMessage('shoreMessages', senderLabel, 
+                             `${message.subject || 'メッセージ'}: ${message.body}`, 'received');
+                };
+                
+                shoreWs.onerror = function(error) {
+                    console.error('拠点WebSocketエラー:', error);
+                    addMessage('shoreMessages', 'システム', 'WebSocket接続エラーが発生しました', 'received');
+                };
+                
+            } catch (error) {
+                console.error('拠点接続エラー:', error);
+                alert('接続に失敗しました。MMSサービスが起動していることを確認してください。');
+            }
+        }
+        
+        // メッセージ送信関数
+        function sendMessage(ws, recipientMrn, messageType, subject, body) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('接続が確立されていません');
+                return;
+            }
+            
+            const message = {
+                recipient_mrn: recipientMrn,
+                message_type: messageType,
+                subject: subject,
+                body: body,
+                priority: "normal",
+                metadata: {},
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(message));
+            return message;
+        }
+        
+        // UI更新関数
+        function updateStatus(elementId, text, className) {
+            const element = document.getElementById(elementId);
+            element.textContent = text;
+            element.className = `status ${className}`;
+        }
+        
+        function addMessage(containerId, sender, content, type) {
+            const container = document.getElementById(containerId);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const senderLabel = sender.includes('urn:mrn:') ? 
+                (sender.includes('vessel') ? '船舶' : '拠点') : sender;
+            
+            messageDiv.innerHTML = `
+                <strong>${senderLabel}</strong><br>
+                ${content}<br>
+                <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // イベントリスナー設定
+        document.addEventListener('DOMContentLoaded', function() {
+            // 接続ボタン
+            document.getElementById('vesselConnect').addEventListener('click', connectVessel);
+            document.getElementById('shoreConnect').addEventListener('click', connectShore);
+            
+            document.getElementById('vesselDisconnect').addEventListener('click', function() {
+                if (vesselWs) vesselWs.close();
+            });
+            
+            document.getElementById('shoreDisconnect').addEventListener('click', function() {
+                if (shoreWs) shoreWs.close();
+            });
+            
+            // メッセージ送信ボタン
+            document.getElementById('vesselSend').addEventListener('click', function() {
+                const messageType = document.getElementById('vesselMessageType').value;
+                const subject = document.getElementById('vesselSubject').value;
+                const body = document.getElementById('vesselMessage').value;
+                
+                const message = sendMessage(vesselWs, shoreMrn, messageType, subject, body);
+                if (message) {
+                    addMessage('vesselMessages', '自分', `${subject}: ${body}`, 'sent');
+                }
+            });
+            
+            document.getElementById('shoreSend').addEventListener('click', function() {
+                const messageType = document.getElementById('shoreMessageType').value;
+                const subject = document.getElementById('shoreSubject').value;
+                const body = document.getElementById('shoreMessage').value;
+                
+                const message = sendMessage(shoreWs, vesselMrn, messageType, subject, body);
+                if (message) {
+                    addMessage('shoreMessages', '自分', `${subject}: ${body}`, 'sent');
+                }
+            });
+            
+            // クイックアクションボタン（船舶）
+            document.getElementById('sendPosition').addEventListener('click', function() {
+                const message = sendMessage(vesselWs, shoreMrn, 'position_report', '位置報告',
+                    '緯度: 35.6762, 経度: 139.6503, 針路: 090°, 速力: 12kts');
+                if (message) {
+                    addMessage('vesselMessages', '自分', '位置報告: 緯度: 35.6762, 経度: 139.6503, 針路: 090°, 速力: 12kts', 'sent');
+                }
+            });
+            
+            document.getElementById('sendPortRequest').addEventListener('click', function() {
+                const message = sendMessage(vesselWs, shoreMrn, 'port_entry_request', '入港要請',
+                    '東京港への入港を要請します。ETA: 14:30');
+                if (message) {
+                    addMessage('vesselMessages', '自分', '入港要請: 東京港への入港を要請します。ETA: 14:30', 'sent');
+                }
+            });
+            
+            document.getElementById('sendEmergency').addEventListener('click', function() {
+                const message = sendMessage(vesselWs, shoreMrn, 'distress_alert', '緊急警報',
+                    'エンジン故障により航行不能。緊急支援要請。');
+                if (message) {
+                    addMessage('vesselMessages', '自分', '緊急警報: エンジン故障により航行不能。緊急支援要請。', 'sent');
+                }
+            });
+            
+            document.getElementById('sendStatus').addEventListener('click', function() {
+                const message = sendMessage(vesselWs, shoreMrn, 'status_update', '状態更新',
+                    '現在の状態: 航行中、積荷: コンテナ1500TEU、目的地: 東京港');
+                if (message) {
+                    addMessage('vesselMessages', '自分', '状態更新: 現在の状態: 航行中、積荷: コンテナ1500TEU、目的地: 東京港', 'sent');
+                }
+            });
+            
+            // クイックアクションボタン（拠点）
+            document.getElementById('sendNavigation').addEventListener('click', function() {
+                const message = sendMessage(shoreWs, vesselMrn, 'navigation_instruction', '航行指示',
+                    '分離航路の右側通行を維持してください。速力を12ノット以下に制限します。');
+                if (message) {
+                    addMessage('shoreMessages', '自分', '航行指示: 分離航路の右側通行を維持してください。速力を12ノット以下に制限します。', 'sent');
+                }
+            });
+            
+            document.getElementById('sendClearance').addEventListener('click', function() {
+                const message = sendMessage(shoreWs, vesselMrn, 'port_clearance', '入港許可',
+                    '入港許可します。バース番号: T-7、水先人: 必要、ETA承認: 14:30');
+                if (message) {
+                    addMessage('shoreMessages', '自分', '入港許可: 入港許可します。バース番号: T-7、水先人: 必要、ETA承認: 14:30', 'sent');
+                }
+            });
+            
+            document.getElementById('sendWeatherAlert').addEventListener('click', function() {
+                const message = sendMessage(shoreWs, vesselMrn, 'weather_alert', '気象警報',
+                    '強風警報: 東京湾内で北風15-20m/s、波高2-3m。航行注意。');
+                if (message) {
+                    addMessage('shoreMessages', '自分', '気象警報: 強風警報: 東京湾内で北風15-20m/s、波高2-3m。航行注意。', 'sent');
+                }
+            });
+            
+            document.getElementById('sendAck').addEventListener('click', function() {
+                const message = sendMessage(shoreWs, vesselMrn, 'acknowledgment', '確認応答',
+                    '位置報告を受信しました。指示に従って航行を継続してください。');
+                if (message) {
+                    addMessage('shoreMessages', '自分', '確認応答: 位置報告を受信しました。指示に従って航行を継続してください。', 'sent');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
