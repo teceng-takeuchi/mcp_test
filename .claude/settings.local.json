@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(chmod:*)",
+      "Bash(npm run notify:*)",
+      "Bash(mkdir:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose:*)",
+      "Bash(./scripts/health-check.sh:*)",
+      "Bash(./scripts/start.sh:*)",
+      "Bash(./scripts/reset.sh:*)",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(docker logs:*)",
+      "Bash(nginx:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker inspect:*)"
+    ],
+    "deny": []
+  }
+}

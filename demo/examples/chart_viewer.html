@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP 海図データビューアー</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #map {
+            flex: 2;
+            height: 100%;
+        }
+        
+        #sidebar {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            margin: 0 0 20px 0;
+            color: #333;
+            font-size: 24px;
+        }
+        
+        h2 {
+            color: #555;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .connected { 
+            background-color: #d4edda; 
+            color: #155724; 
+        }
+        
+        .disconnected { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+        }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .route-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .depth-legend {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+        
+        .depth-gradient {
+            height: 20px;
+            flex: 1;
+            background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+            border-radius: 4px;
+            margin: 0 10px;
+        }
+        
+        .warning-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        
+        .warning-critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #messageLog {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+        
+        .popup-content {
+            font-size: 14px;
+        }
+        
+        .waypoint-marker {
+            background-color: #007bff;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="map"></div>
+        <div id="sidebar">
+            <h1>🗺️ 海図データビューアー</h1>
+            
+            <div id="connectionStatus" class="status disconnected">
+                未接続
+            </div>
+            
+            <div class="control-group">
+                <h2>接続設定</h2>
+                <select id="roleSelect">
+                    <option value="vessel">船舶として接続</option>
+                    <option value="vts">VTSとして接続</option>
+                </select>
+                <button id="connectBtn">接続</button>
+                <button id="disconnectBtn" disabled>切断</button>
+            </div>
+            
+            <div class="control-group">
+                <h2>航路計画</h2>
+                <button id="loadRouteBtn">サンプル航路を表示</button>
+                <button id="clearRouteBtn">航路をクリア</button>
+                <div id="routeInfo" class="route-info" style="display: none;">
+                    <div class="info-item">
+                        <span class="info-label">航路名:</span>
+                        <span id="routeName">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">出発港:</span>
+                        <span id="departurePort">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">到着港:</span>
+                        <span id="arrivalPort">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">総距離:</span>
+                        <span id="totalDistance">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h2>測深データ</h2>
+                <button id="showDepthBtn">測深データを表示</button>
+                <button id="clearDepthBtn">測深データをクリア</button>
+                <div class="depth-legend">
+                    <span>0m</span>
+                    <div class="depth-gradient"></div>
+                    <span>100m</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h2>航行警報</h2>
+                <button id="addWarningBtn">警報エリアを追加</button>
+                <button id="clearWarningsBtn">警報をクリア</button>
+                <div id="warningsList"></div>
+            </div>
+            
+            <div class="control-group">
+                <h2>メッセージログ</h2>
+                <div id="messageLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let map;
+        let ws = null;
+        let currentRole = 'vessel';
+        let routeLayer = null;
+        let depthLayer = null;
+        let warningsLayer = null;
+        let markers = [];
+        
+        // MRN定義
+        const mrns = {
+            vessel: 'urn:mrn:mcp:vessel:imo:1234567',
+            vts: 'urn:mrn:mcp:shore:authority:vts:tokyo-bay'
+        };
+        
+        // 地図の初期化
+        function initMap() {
+            map = L.map('map').setView([35.0, 139.0], 7);
+            
+            // OpenStreetMapタイル
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // レイヤーグループの初期化
+            routeLayer = L.layerGroup().addTo(map);
+            depthLayer = L.layerGroup().addTo(map);
+            warningsLayer = L.layerGroup().addTo(map);
+        }
+        
+        // WebSocket接続
+        function connect() {
+            const role = document.getElementById('roleSelect').value;
+            currentRole = role;
+            const mrn = mrns[role];
+            
+            try {
+                ws = new WebSocket(`ws://localhost:8083/ws/${encodeURIComponent(mrn)}`);
+                
+                ws.onopen = function() {
+                    updateConnectionStatus(true);
+                    logMessage(`${role === 'vessel' ? '船舶' : 'VTS'}として接続しました`);
+                };
+                
+                ws.onclose = function() {
+                    updateConnectionStatus(false);
+                    logMessage('接続が切断されました');
+                };
+                
+                ws.onmessage = function(event) {
+                    const message = JSON.parse(event.data);
+                    handleMessage(message);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocketエラー:', error);
+                    logMessage('接続エラーが発生しました');
+                };
+                
+            } catch (error) {
+                alert('接続に失敗しました。MMSサービスが起動していることを確認してください。');
+            }
+        }
+        
+        // メッセージ処理
+        function handleMessage(message) {
+            const msgType = message.message_type;
+            logMessage(`受信: ${message.subject || msgType}`);
+            
+            switch (msgType) {
+                case 'route_exchange':
+                    handleRouteExchange(message);
+                    break;
+                case 'bathymetric_stream':
+                    handleBathymetricData(message);
+                    break;
+                case 'navigational_warning':
+                    handleNavigationalWarning(message);
+                    break;
+                case 'chart_update':
+                    handleChartUpdate(message);
+                    break;
+            }
+        }
+        
+        // 航路データ処理
+        function handleRouteExchange(message) {
+            const attachments = message.attachments || [];
+            const metadata = message.metadata || {};
+            
+            if (attachments.length > 0) {
+                // RTZデータから航路を抽出（簡易パース）
+                const rtzData = attachments[0].data;
+                displayRouteFromRTZ(rtzData, metadata);
+            }
+        }
+        
+        // 測深データ処理
+        function handleBathymetricData(message) {
+            const points = message.data || [];
+            const metadata = message.metadata || {};
+            
+            displayBathymetricPoints(points, metadata);
+        }
+        
+        // 航行警報処理
+        function handleNavigationalWarning(message) {
+            const warning = message.data || {};
+            displayWarning(warning);
+        }
+        
+        // サンプル航路表示
+        function loadSampleRoute() {
+            const sampleRoute = {
+                name: "東京-大阪定期航路",
+                departure: "東京港",
+                arrival: "大阪港",
+                waypoints: [
+                    {lat: 35.45, lng: 139.65, name: "東京湾出口"},
+                    {lat: 35.20, lng: 139.70, name: "相模湾"},
+                    {lat: 35.00, lng: 139.50, name: "伊豆沖"},
+                    {lat: 34.70, lng: 138.90, name: "遠州灘"},
+                    {lat: 34.50, lng: 137.00, name: "熊野灘"},
+                    {lat: 34.40, lng: 135.20, name: "紀伊水道"},
+                    {lat: 34.60, lng: 135.40, name: "大阪湾入口"}
+                ]
+            };
+            
+            displayRoute(sampleRoute);
+        }
+        
+        // 航路表示
+        function displayRoute(route) {
+            clearRoute();
+            
+            // 航路線
+            const latlngs = route.waypoints.map(wp => [wp.lat, wp.lng]);
+            const polyline = L.polyline(latlngs, {
+                color: '#007bff',
+                weight: 3,
+                opacity: 0.8
+            }).addTo(routeLayer);
+            
+            // 航路点マーカー
+            route.waypoints.forEach((wp, index) => {
+                const marker = L.circleMarker([wp.lat, wp.lng], {
+                    radius: 8,
+                    fillColor: index === 0 ? '#28a745' : index === route.waypoints.length - 1 ? '#dc3545' : '#007bff',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(routeLayer);
+                
+                marker.bindPopup(`
+                    <div class="popup-content">
+                        <strong>WP${index + 1}: ${wp.name}</strong><br>
+                        位置: ${wp.lat.toFixed(3)}, ${wp.lng.toFixed(3)}
+                    </div>
+                `);
+                
+                markers.push(marker);
+            });
+            
+            // 地図を航路に合わせる
+            map.fitBounds(polyline.getBounds());
+            
+            // 航路情報更新
+            document.getElementById('routeInfo').style.display = 'block';
+            document.getElementById('routeName').textContent = route.name;
+            document.getElementById('departurePort').textContent = route.departure;
+            document.getElementById('arrivalPort').textContent = route.arrival;
+            document.getElementById('totalDistance').textContent = calculateTotalDistance(route.waypoints) + ' 海里';
+        }
+        
+        // RTZデータから航路表示
+        function displayRouteFromRTZ(rtzXml, metadata) {
+            // 簡易的なXMLパース（実際はより堅牢なパーサーが必要）
+            const routeName = rtzXml.match(/routeName="([^"]+)"/)?.[1] || '不明';
+            const departure = rtzXml.match(/name="departure_port" value="([^"]+)"/)?.[1] || '-';
+            const arrival = rtzXml.match(/name="arrival_port" value="([^"]+)"/)?.[1] || '-';
+            
+            // 航路点の抽出（簡易版）
+            const waypoints = [];
+            const wpMatches = rtzXml.matchAll(/lat="([\d.]+)" lon="([\d.]+)"/g);
+            let index = 1;
+            for (const match of wpMatches) {
+                waypoints.push({
+                    lat: parseFloat(match[1]),
+                    lng: parseFloat(match[2]),
+                    name: `WP${index++}`
+                });
+            }
+            
+            if (waypoints.length > 0) {
+                displayRoute({
+                    name: routeName,
+                    departure: departure,
+                    arrival: arrival,
+                    waypoints: waypoints
+                });
+            }
+        }
+        
+        // 測深データ表示
+        function showSampleDepthData() {
+            const samplePoints = [];
+            
+            // サンプルデータ生成
+            for (let lat = 34.5; lat <= 35.5; lat += 0.1) {
+                for (let lng = 135.0; lng <= 140.0; lng += 0.1) {
+                    const depth = 20 + Math.random() * 80; // 20-100m
+                    samplePoints.push({
+                        latitude: lat,
+                        longitude: lng,
+                        depth: depth
+                    });
+                }
+            }
+            
+            displayBathymetricPoints(samplePoints, {area_name: "サンプルエリア"});
+        }
+        
+        // 測深点表示
+        function displayBathymetricPoints(points, metadata) {
+            points.forEach(point => {
+                const color = getDepthColor(point.depth);
+                
+                const circle = L.circle([point.latitude, point.longitude], {
+                    radius: 1000, // 1km
+                    fillColor: color,
+                    color: color,
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                }).addTo(depthLayer);
+                
+                circle.bindPopup(`
+                    <div class="popup-content">
+                        <strong>測深点</strong><br>
+                        水深: ${point.depth.toFixed(1)}m<br>
+                        品質: ${point.quality_indicator || '-'}/5
+                    </div>
+                `);
+            });
+            
+            logMessage(`測深データ: ${metadata.area_name || '不明'} (${points.length}点)`);
+        }
+        
+        // 水深による色分け
+        function getDepthColor(depth) {
+            if (depth < 20) return '#ff0000';      // 浅い（赤）
+            if (depth < 40) return '#ff9900';      // オレンジ
+            if (depth < 60) return '#ffff00';      // 黄色
+            if (depth < 80) return '#00ff00';      // 緑
+            return '#0000ff';                       // 深い（青）
+        }
+        
+        // 警報エリア追加
+        function addSampleWarning() {
+            const warning = {
+                warning_id: `WARN-${Date.now()}`,
+                warning_type: 'restricted_area',
+                severity: 'major',
+                description: '海上工事による通行制限区域',
+                area_wkt: 'POLYGON((139.5 35.0, 139.6 35.0, 139.6 35.1, 139.5 35.1, 139.5 35.0))'
+            };
+            
+            displayWarning(warning);
+        }
+        
+        // 警報表示
+        function displayWarning(warning) {
+            // WKTから座標を抽出（簡易版）
+            const coords = warning.area_wkt.match(/([\d.]+) ([\d.]+)/g);
+            if (coords) {
+                const latlngs = coords.map(coord => {
+                    const [lng, lat] = coord.split(' ');
+                    return [parseFloat(lat), parseFloat(lng)];
+                });
+                
+                const color = warning.severity === 'critical' ? '#dc3545' : 
+                            warning.severity === 'major' ? '#ffc107' : '#28a745';
+                
+                const polygon = L.polygon(latlngs, {
+                    color: color,
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.3,
+                    fillColor: color
+                }).addTo(warningsLayer);
+                
+                polygon.bindPopup(`
+                    <div class="popup-content">
+                        <strong>航行警報</strong><br>
+                        種類: ${warning.warning_type}<br>
+                        重要度: ${warning.severity}<br>
+                        説明: ${warning.description}
+                    </div>
+                `);
+                
+                // 警報リストに追加
+                addWarningToList(warning);
+            }
+        }
+        
+        // 警報リスト更新
+        function addWarningToList(warning) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = `warning-item ${warning.severity === 'critical' ? 'warning-critical' : ''}`;
+            warningDiv.innerHTML = `
+                <strong>${warning.warning_type}</strong><br>
+                ${warning.description}
+            `;
+            document.getElementById('warningsList').appendChild(warningDiv);
+        }
+        
+        // 航路クリア
+        function clearRoute() {
+            routeLayer.clearLayers();
+            markers = [];
+            document.getElementById('routeInfo').style.display = 'none';
+        }
+        
+        // 測深データクリア
+        function clearDepthData() {
+            depthLayer.clearLayers();
+        }
+        
+        // 警報クリア
+        function clearWarnings() {
+            warningsLayer.clearLayers();
+            document.getElementById('warningsList').innerHTML = '';
+        }
+        
+        // 総距離計算
+        function calculateTotalDistance(waypoints) {
+            let total = 0;
+            for (let i = 1; i < waypoints.length; i++) {
+                total += calculateDistance(
+                    waypoints[i-1].lat, waypoints[i-1].lng,
+                    waypoints[i].lat, waypoints[i].lng
+                );
+            }
+            return total.toFixed(1);
+        }
+        
+        // 2点間距離計算（海里）
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 3440.065; // 地球半径（海里）
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        // 接続状態更新
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = `接続中 (${currentRole === 'vessel' ? '船舶' : 'VTS'})`;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '未接続';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+        
+        // メッセージログ
+        function logMessage(message) {
+            const log = document.getElementById('messageLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // イベントリスナー設定
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            
+            document.getElementById('connectBtn').addEventListener('click', connect);
+            document.getElementById('disconnectBtn').addEventListener('click', function() {
+                if (ws) ws.close();
+            });
+            
+            document.getElementById('loadRouteBtn').addEventListener('click', loadSampleRoute);
+            document.getElementById('clearRouteBtn').addEventListener('click', clearRoute);
+            
+            document.getElementById('showDepthBtn').addEventListener('click', showSampleDepthData);
+            document.getElementById('clearDepthBtn').addEventListener('click', clearDepthData);
+            
+            document.getElementById('addWarningBtn').addEventListener('click', addSampleWarning);
+            document.getElementById('clearWarningsBtn').addEventListener('click', clearWarnings);
+        });
+    </script>
+</body>
+</html>

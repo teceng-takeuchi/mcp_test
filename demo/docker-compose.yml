@@ -1,0 +1,227 @@
+version: '3.8'
+
+services:
+  # PostgreSQLデータベース
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: mcp-demo-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-mcp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mcp123}
+      POSTGRES_DB: ${DB_NAME:-mcp_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mcp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis（キャッシュ・セッション管理）
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-demo-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis123}
+    ports:
+      - "6379:6379"
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak（Identity Broker）
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    container_name: mcp-demo-keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: ${DB_USER:-mcp}
+      KC_DB_PASSWORD: ${DB_PASSWORD:-mcp123}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY: edge
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+    command:
+      - start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mcp-network
+
+  # Maritime Identity Registry
+  mir:
+    build:
+      context: ./mir
+      dockerfile: Dockerfile
+    container_name: mcp-demo-mir
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: mir_db
+      DB_USER: ${DB_USER:-mcp}
+      DB_PASSWORD: ${DB_PASSWORD:-mcp123}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: mcp
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - mir_data:/app/data
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+      - redis
+      - keycloak
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Maritime Service Registry
+  msr:
+    build:
+      context: ./msr
+      dockerfile: Dockerfile
+    container_name: mcp-demo-msr
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: msr_db
+      DB_USER: ${DB_USER:-mcp}
+      DB_PASSWORD: ${DB_PASSWORD:-mcp123}
+      MIR_URL: http://mir:8081
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: mcp
+    volumes:
+      - msr_data:/app/data
+    ports:
+      - "8082:8082"
+    depends_on:
+      - postgres
+      - mir
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # メッセージブローカー（Kafka）
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: mcp-demo-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - mcp-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: mcp-demo-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - mcp-network
+
+  # Maritime Messaging Service
+  mms:
+    build:
+      context: ./mms
+      dockerfile: Dockerfile
+    container_name: mcp-demo-mms
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+      MIR_URL: http://mir:8081
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: mcp
+    volumes:
+      - mms_data:/app/data
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - redis
+      - mir
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx リバースプロキシ
+  nginx:
+    image: nginx:alpine
+    container_name: mcp-demo-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - keycloak
+      - mir
+      - msr
+      - mms
+    networks:
+      - mcp-network
+
+  # Web UI（管理ポータル）- 一時的にコメントアウト
+  # web-ui:
+  #   build:
+  #     context: ./web-ui
+  #     dockerfile: Dockerfile
+  #   container_name: mcp-demo-web-ui
+  #   environment:
+  #     REACT_APP_API_BASE_URL: http://localhost:80
+  #     REACT_APP_KEYCLOAK_URL: http://localhost:8080
+  #     REACT_APP_KEYCLOAK_REALM: mcp
+  #     REACT_APP_KEYCLOAK_CLIENT_ID: mcp-web-ui
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - nginx
+  #   networks:
+  #     - mcp-network
+
+volumes:
+  postgres_data:
+  mir_data:
+  msr_data:
+  mms_data:
+
+networks:
+  mcp-network:
+    driver: bridge

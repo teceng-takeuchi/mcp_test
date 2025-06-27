@@ -1,0 +1,14 @@
+{
+  "name": "mcp_test",
+  "version": "1.0.0",
+  "description": "Maritime Connectivity Platform project with task notification",
+  "main": "index.js",
+  "scripts": {
+    "notify": "node play-notification.js",
+    "test:with-notify": "./run-with-notification.sh npm test",
+    "build:with-notify": "./run-with-notification.sh npm run build"
+  },
+  "keywords": ["mcp", "maritime", "notification"],
+  "author": "",
+  "license": "ISC"
+}
